@@ -695,10 +695,13 @@ def onedrive(link):
 def pixeldrain(url):
     try:
         url = url.rstrip("/")
-        code = url.split("/")[-1].split("?", 1)[0]
-        response = get("https://pd.cybar.xyz/", allow_redirects=True)
-        return response.url + code
-    except Exception as e:
+        if "pixeldrain" not in url:
+            raise DirectDownloadLinkException("ERROR: Not a Pixeldrain link")
+        parts = url.split("/")
+        code = parts[-1].split("?", 1)[0]
+        domain = parts[2]
+        return f"https://{domain}/api/file/{code}"
+    except Exception:
         raise DirectDownloadLinkException("ERROR: Direct link not found")
 
 
