@@ -302,9 +302,9 @@ async def get_user_settings(from_user, stype="main"):
         buttons.data_button(
             "General Settings", f"userset {user_id} general", position="header"
         )
-        buttons.data_button("Mirror Settings", f"userset {user_id} mirror")
+        #buttons.data_button("Mirror Settings", f"userset {user_id} mirror")
         buttons.data_button("Leech Settings", f"userset {user_id} leech")
-        buttons.data_button("Uphoster Settings", f"userset {user_id} uphoster")
+        #buttons.data_button("Uphoster Settings", f"userset {user_id} uphoster")
         buttons.data_button("FF Media Settings", f"userset {user_id} ffset")
         buttons.data_button(
             "Mics Settings", f"userset {user_id} advanced", position="l_body"
