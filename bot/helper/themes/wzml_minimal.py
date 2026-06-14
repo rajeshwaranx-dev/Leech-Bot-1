@@ -3,13 +3,13 @@ class WZMLStyle:
     # ----------------------
     # async def start(client, message) ---> __main__.py
     ST_BN1_NAME = "Repo"
-    ST_BN1_URL = "https://www.github.com/weebzone/WZML-X"
+    ST_BN1_URL = "https://t.me/Master_xkid"
     ST_BN2_NAME = "Updates"
-    ST_BN2_URL = "https://t.me/WZML_X"
+    ST_BN2_URL = "https://t.me/AskBotz"
     ST_MSG = """<i>This bot can mirror all your links|files|torrents to Google Drive or any rclone cloud or to telegram or to ddl servers.</i>
 <b>Type {help_command} to get a list of available commands</b>"""
     ST_BOTPM = """<i>Now, This bot will send all your files and links here. Start Using ...</i>"""
-    ST_UNAUTH = """<i>You Are not authorized user! Deploy your own WZML-X Mirror-Leech bot</i>"""
+    ST_UNAUTH = """<i>You Are not authorized user! Deploy your own Mirror-Leech bot</i>"""
     OWN_TOKEN_GENERATE = (
         """<b>Temporary Token is not yours!</b>\n\n<i>Kindly generate your own.</i>"""
     )
@@ -117,7 +117,9 @@ class WZMLStyle:
 ┠ <b>Time:</b> {time}
 ┠ <b>TimeZone:</b> {timz}
 ┖ <b>Version:</b> {version}"""
-    RESTARTED = """⌬ <b><i>Bot Restarted!</i></b>"""
+    RESTARTED = """⌬ <b><i>Bot Restarted!</i></b>
+    
+    ❤️ <b>Powered by</b> <a href="https://t.me/Askbotz">@Askbotz</a> ❤️"""
     # ---------------------
 
     # async def ping(client, message): ---> __main__.py
@@ -276,7 +278,9 @@ class WZMLStyle:
 ┠<b> User Session :</b> <code>{USESS}</code>
 ┠<b> MediaInfo Mode :</b> <code>{MEDIAINFO}</code>
 ┠<b> Save Mode :</b> <code>{SAVE_MODE}</code>
-┖<b> User Bot PM :</b> <code>{BOT_PM}</code>"""
+┖<b> User Bot PM :</b> <code>{BOT_PM}</code>
+
+❤️ <b>Powered by</b> <a href="https://t.me/AskBotz">@Askbotz</a> ❤️"""
 
     MIRROR = """㊂ <b><u>Mirror/Clone Settings : {NAME}</u></b>
 
@@ -287,7 +291,9 @@ class WZMLStyle:
 ┠<b> DDL Server(s) :</b> <i>{DDL_SERVER}</i>
 ┠<b> User TD Mode :</b> <i>{TMODE}</i>
 ┠<b> Total User TD(s) :</b> <i>{USERTD}</i>
-┖<b> Daily Mirror :</b> <code>{DM}</code> per day"""
+┖<b> Daily Mirror :</b> <code>{DM}</code> per day
+
+❤️ <b>Powered by</b> <a href="https://t.me/AskBotz">@Askbotz</a> ❤️"""
 
     LEECH = """㊂ <b><u>Leech Settings for {NAME}</u></b>
 
@@ -302,4 +308,6 @@ class WZMLStyle:
 ┠<b> Leech Suffix :</b> <code>{LSUFFIX}</code>
 ┠<b> Leech Dumps :</b> <code>{LDUMP}</code>
 ┠<b> Leech Remname :</b> <code>{LREMNAME}</code>
-┖<B> Leech Metadata :</b> <code>{LMETA}</code>"""
+┖<B> Leech Metadata :</b> <code>{LMETA}</code>
+
+❤️ <b>Powered by</b> <a href="https://t.me/AskBotz">@Askbotz</a> ❤️"""
