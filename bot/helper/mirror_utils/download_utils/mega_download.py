@@ -2,7 +2,10 @@
 from secrets import token_hex
 from aiofiles.os import makedirs
 from asyncio import Event
-from mega import MegaApi, MegaListener, MegaRequest, MegaTransfer, MegaError
+try:
+    from mega import MegaApi, MegaListener, MegaRequest, MegaTransfer, MegaError
+except Exception:
+    MegaApi = MegaListener = MegaRequest = MegaTransfer = MegaError = None
 
 from bot import (
     LOGGER,
@@ -27,8 +30,8 @@ from bot.helper.ext_utils.task_manager import (
 )
 
 
-class MegaAppListener(MegaListener):
-    _NO_EVENT_ON = (MegaRequest.TYPE_LOGIN, MegaRequest.TYPE_FETCH_NODES)
+class MegaAppListener(MegaListener if MegaListener else object):
+    _NO_EVENT_ON = (MegaRequest.TYPE_LOGIN, MegaRequest.TYPE_FETCH_NODES) if MegaRequest else ()
     NO_ERROR = "no error"
 
     def __init__(self, continue_event: Event, listener):
