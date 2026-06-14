@@ -71,7 +71,7 @@ default_values = {
     "BOT_LANG": "en",
     "IMG_PAGE": 1,
     "AUTHOR_NAME": "WZML-X",
-    "AUTHOR_URL": "https://t.me/WZML_X",
+    "AUTHOR_URL": "https://t.me/AskBotz",
     "TITLE_NAME": "WZ Mirror/Leech X",
     "GD_INFO": "Uploaded by WZML-X",
 }
