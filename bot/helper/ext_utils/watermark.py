@@ -7,7 +7,7 @@ from bot import LOGGER
 VIDEO_EXTENSIONS = {".mkv", ".mp4", ".avi", ".mov", ".ts", ".m2ts", ".webm", ".flv"}
 
 
-def add_watermark_clip(file_path, output_path, watermark_text, duration=10):
+def add_watermark_clip(file_path, output_path, watermark_text, duration=10, font_size=24):
     """
     Burn watermark text onto the video, visible only from 00:00 to `duration` seconds,
     positioned at bottom-center (subtitle position).
@@ -22,7 +22,7 @@ def add_watermark_clip(file_path, output_path, watermark_text, duration=10):
 
     drawtext = (
         f"drawtext=text='{safe_text}':"
-        f"fontcolor=white:fontsize=24:"
+        f"fontcolor=white:fontsize={font_size}:"
         f"box=1:boxcolor=black@0.5:boxborderw=8:"
         f"x=(w-text_w)/2:y=h-th-40:"
         f"enable='between(t,0,{duration})'"
@@ -48,13 +48,14 @@ def add_watermark_clip(file_path, output_path, watermark_text, duration=10):
     return output_path
 
 
-async def auto_watermark_leech(up_dir, watermark_enabled, watermark_text="", duration=10):
+async def auto_watermark_leech(up_dir, watermark_enabled, watermark_text="", duration=10, font_size=24):
     """
     Main entry point called from tasks_listener before TgUploader.
 
     watermark_enabled: bool, user's Watermark toggle
     watermark_text: str, user's configured text (e.g. channel name)
     duration: int, seconds the watermark is visible from start of video
+    font_size: int, size of the watermark text in pixels (default 24)
 
     Re-encodes each video file IN PLACE (replaces original) with the
     watermark burned in for the first `duration` seconds only.
@@ -74,13 +75,13 @@ async def auto_watermark_leech(up_dir, watermark_enabled, watermark_text="", dur
         return up_dir
 
     LOGGER.info(
-        f"Watermark: Applying '{watermark_text}' for {duration}s to {len(all_files)} file(s)"
+        f"Watermark: Applying '{watermark_text}' for {duration}s at size {font_size}px to {len(all_files)} file(s)"
     )
 
     for file_path in all_files:
         try:
             temp_output = file_path + ".watermarked.mp4"
-            add_watermark_clip(file_path, temp_output, watermark_text, duration)
+            add_watermark_clip(file_path, temp_output, watermark_text, duration, font_size)
 
             # Replace original with watermarked version
             os.remove(file_path)
@@ -99,4 +100,4 @@ async def auto_watermark_leech(up_dir, watermark_enabled, watermark_text="", dur
             continue
 
     return up_dir
-
+    
