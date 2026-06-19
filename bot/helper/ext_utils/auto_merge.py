@@ -69,6 +69,59 @@ def merge_files_ffmpeg(file_list, output_path):
     return output_path
 
 
+def extract_episode_num(filename):
+    """Extract episode number from a filename for range detection."""
+    patterns = [
+        r"s\d+e(\d+)",
+        r"ep?\s*(\d+)",
+        r"episode\s*(\d+)",
+        r"part\s*(\d+)",
+    ]
+    name = Path(filename).stem
+    for pat in patterns:
+        match = re.search(pat, name, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def build_merged_filename(series_name, episodes):
+    """
+    Build an output filename that preserves the original naming/quality/tags,
+    only replacing the single episode number with the merged range.
+    Falls back to '<series_name>_merged.mkv' if pattern can't be matched.
+    """
+    first_file = Path(episodes[0]).name
+    ext = Path(first_file).suffix or ".mkv"
+
+    first_ep = extract_episode_num(episodes[0])
+    last_ep = extract_episode_num(episodes[-1])
+
+    # Try to replace the episode marker in the FIRST file's name with a range
+    # e.g. "...S01_EP_29...TRUE_WEB-DL..." -> "...S01_EP_29-32...TRUE_WEB-DL..."
+    ep_pattern = re.compile(r"(s\d+[\s_\-]?ep?[\s_\-]?)(\d+)", re.IGNORECASE)
+    match = ep_pattern.search(Path(first_file).stem)
+
+    if match and first_ep is not None and last_ep is not None:
+        stem = Path(first_file).stem
+        range_str = f"{first_ep:02d}-{last_ep:02d}" if first_ep != last_ep else f"{first_ep:02d}"
+        new_stem = ep_pattern.sub(rf"\g<1>{range_str}", stem, count=1)
+        return new_stem + ext
+
+    # Fallback: try generic ep##  or e## replace anywhere
+    ep_pattern2 = re.compile(r"(ep?)(\d+)", re.IGNORECASE)
+    match2 = ep_pattern2.search(Path(first_file).stem)
+    if match2 and first_ep is not None and last_ep is not None:
+        stem = Path(first_file).stem
+        range_str = f"{first_ep:02d}-{last_ep:02d}" if first_ep != last_ep else f"{first_ep:02d}"
+        new_stem = ep_pattern2.sub(rf"\g<1>{range_str}", stem, count=1)
+        return new_stem + ext
+
+    # Last resort fallback
+    safe_name = re.sub(r'[<>:"/\\|?*]', "_", series_name).strip()
+    return f"{safe_name}_merged{ext}"
+
+
 async def auto_merge_leech(up_dir, merge_mode):
     """
     Main entry point called from tasks_listener before TgUploader.
@@ -103,9 +156,9 @@ async def auto_merge_leech(up_dir, merge_mode):
     LOGGER.info(f"Auto Merge: Detected {len(groups)} series group(s): {list(groups.keys())}")
 
     for series_name, episodes in groups.items():
-        # Use .mkv as output container (most compatible)
-        safe_name = re.sub(r'[<>:"/\\|?*]', "_", series_name).strip()
-        output_path = os.path.join(up_dir, f"{safe_name}_merged.mkv")
+        # Build output filename preserving original quality/tags, just fixing episode range
+        merged_filename = build_merged_filename(series_name, episodes)
+        output_path = os.path.join(up_dir, merged_filename)
 
         LOGGER.info(f"Auto Merge: Merging '{series_name}' ({len(episodes)} episodes) -> {output_path}")
 
@@ -127,3 +180,4 @@ async def auto_merge_leech(up_dir, merge_mode):
             continue
 
     return up_dir
+        
