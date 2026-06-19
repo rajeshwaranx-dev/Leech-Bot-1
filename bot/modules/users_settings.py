@@ -125,6 +125,10 @@ desp_dict = {
         "Your Channel Name that will be used while editing metadata of the Video File",
         "Send Metadata Text for Leeching Files.\n<b>Timeout:</b> 60 Sec.",
     ],
+    "merge_mode": [
+        "Controls how multiple downloaded files are handled during upload. 'off' disables merging, 'merge' uploads only the merged file, 'both' uploads merged and separate files.",
+        "Choose Merge Mode from the buttons below.",
+    ],
 }
 fname_dict = {
     "rcc": "RClone",
@@ -145,6 +149,7 @@ fname_dict = {
     "user_tds": "User Custom TDs",
     "gofile": "GoFile",
     "streamtape": "StreamTape",
+    "merge_mode": "Merge Mode",
 }
 
 
@@ -444,6 +449,12 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
             f"userset {user_id} lmeta",
         )
 
+        merge_mode = user_dict.get("merge_mode", "off")
+        buttons.ibutton(
+            f"🔀 Merge Mode [{merge_mode.upper()}]",
+            f"userset {user_id} merge_mode",
+        )
+
         text = BotTheme(
             "LEECH",
             NAME=name,
@@ -459,6 +470,7 @@ async def get_user_settings(from_user, key=None, edit_type=None, edit_mode=None)
             LDUMP=ldump,
             LREMNAME=escape(lremname),
             LMETA=escape(lmeta),
+            MERGE_MODE=merge_mode,
         )
 
         buttons.ibutton("Back", f"userset {user_id} back", "footer")
@@ -1002,6 +1014,49 @@ async def edit_user_settings(client, query):
         await query.answer()
         update_user_ldata(user_id, "split_size", "")
         await update_user_settings(query, "split_size", "leech")
+        if DATABASE_URL:
+            await DbManger().update_user_data(user_id)
+    elif data[2] == "merge_mode":
+        handler_dict[user_id] = False
+        await query.answer()
+        current_mode = user_dict.get("merge_mode", "off")
+        merge_buttons = ButtonMaker()
+        for mode in ["off", "merge", "both"]:
+            label = f"✅ {mode.capitalize()}" if mode == current_mode else mode.capitalize()
+            merge_buttons.ibutton(label, f"userset {user_id} setmerge {mode}")
+        merge_buttons.ibutton("Back", f"userset {user_id} leech", "footer")
+        merge_buttons.ibutton("Close", f"userset {user_id} close", "footer")
+        text = (
+            f"㊂ <b><u>Merge Mode Settings :</u></b>\n\n"
+            f"➲ <b>Current Mode :</b> <i>{current_mode}</i>\n\n"
+            f"➲ <b>Available Options :</b>\n"
+            f"• <b>off</b> - No merging\n"
+            f"• <b>merge</b> - Upload merged file only\n"
+            f"• <b>both</b> - Upload both merged and separate files\n\n"
+            f"➲ <b>Description :</b> <i>{desp_dict['merge_mode'][0]}</i>"
+        )
+        await editMessage(message, text, merge_buttons.build_menu(3))
+    elif data[2] == "setmerge":
+        handler_dict[user_id] = False
+        new_mode = data[3]
+        await query.answer(f"✅ Merge Mode set to {new_mode.upper()}", show_alert=False)
+        update_user_ldata(user_id, "merge_mode", new_mode)
+        merge_buttons = ButtonMaker()
+        for mode in ["off", "merge", "both"]:
+            label = f"✅ {mode.capitalize()}" if mode == new_mode else mode.capitalize()
+            merge_buttons.ibutton(label, f"userset {user_id} setmerge {mode}")
+        merge_buttons.ibutton("Back", f"userset {user_id} leech", "footer")
+        merge_buttons.ibutton("Close", f"userset {user_id} close", "footer")
+        text = (
+            f"㊂ <b><u>Merge Mode Settings :</u></b>\n\n"
+            f"➲ <b>Current Mode :</b> <i>{new_mode}</i>\n\n"
+            f"➲ <b>Available Options :</b>\n"
+            f"• <b>off</b> - No merging\n"
+            f"• <b>merge</b> - Upload merged file only\n"
+            f"• <b>both</b> - Upload both merged and separate files\n\n"
+            f"➲ <b>Description :</b> <i>{desp_dict['merge_mode'][0]}</i>"
+        )
+        await editMessage(message, text, merge_buttons.build_menu(3))
         if DATABASE_URL:
             await DbManger().update_user_data(user_id)
     elif data[2] == "esplits":
