@@ -308,6 +308,8 @@ class WZMLStyle:
 ┠<b> Leech Suffix :</b> <code>{LSUFFIX}</code>
 ┠<b> Leech Dumps :</b> <code>{LDUMP}</code>
 ┠<b> Leech Remname :</b> <code>{LREMNAME}</code>
-┖<B> Leech Metadata :</b> <code>{LMETA}</code>
+┠<b> Leech Metadata :</b> <code>{LMETA}</code>
+┖<b> Merge Mode :</b> <code>{MERGE_MODE}</code>
 
 ❤️ <b>Powered by</b> <a href="https://t.me/AskBotz">@Askbotz</a> ❤️"""
+    
