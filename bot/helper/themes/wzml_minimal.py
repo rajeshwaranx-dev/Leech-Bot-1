@@ -310,7 +310,8 @@ class WZMLStyle:
 ┠<b> Leech Remname :</b> <code>{LREMNAME}</code>
 ┠<b> Leech Metadata :</b> <code>{LMETA}</code>
 ┠<b> Merge Mode :</b> <code>{MERGE_MODE}</code>
-┖<b> Sample Video :</b> <code>{SAMPLE_VIDEO}</code> (<code>{SAMPLE_DURATION}</code>)
+┠<b> Sample Video :</b> <code>{SAMPLE_VIDEO}</code> (<code>{SAMPLE_DURATION}</code>)
+┖<b> Watermark :</b> <code>{WATERMARK}</code>
 
 ❤️ <b>Powered by</b> <a href="https://t.me/AskBotz">@Askbotz</a> ❤️"""
     
