@@ -60,6 +60,7 @@ from bot.helper.ext_utils.leech_utils import (
     get_document_type,
 )
 from bot.helper.ext_utils.auto_merge import auto_merge_leech
+from bot.helper.ext_utils.sample_video import auto_sample_leech
 from bot.helper.ext_utils.exceptions import NotSupportedExtractionArchive
 from bot.helper.ext_utils.task_manager import start_from_queued
 from bot.helper.mirror_utils.status_utils.extract_status import ExtractStatus
@@ -559,6 +560,13 @@ class MirrorLeechListener:
                 up_dir = await auto_merge_leech(up_dir, merge_mode)
                 up_name = up_dir.rsplit("/", 1)[-1]
             # ---- END AUTO MERGE ----
+            # ---- SAMPLE VIDEO ----
+            sample_enabled = user_dict.get("sample_video", False)
+            if sample_enabled:
+                sample_duration = user_dict.get("sample_duration", 30)
+                LOGGER.info(f"Sample Video: ON | Duration: {sample_duration}s | Path: {up_dir}")
+                up_dir = await auto_sample_leech(up_dir, sample_enabled, sample_duration)
+            # ---- END SAMPLE VIDEO ----
             size = await get_path_size(up_dir)
             for s in m_size:
                 size = size - s
