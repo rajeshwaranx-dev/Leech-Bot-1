@@ -1,3 +1,4 @@
+Content is user-generated and unverified.
 #!/usr/bin/env python3
 from datetime import datetime
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
@@ -149,6 +150,10 @@ desp_dict = {
         "How many seconds the watermark stays visible from the start of the video.",
         "Send Watermark duration in seconds (e.g. 10).\n<b>Timeout:</b> 60 Sec.",
     ],
+    "watermark_size": [
+        "Font size of the watermark text in pixels. Smaller = less intrusive.",
+        "Send Watermark font size in pixels (e.g. 24).\n<b>Timeout:</b> 60 Sec.",
+    ],
 }
 fname_dict = {
     "rcc": "RClone",
@@ -175,6 +180,7 @@ fname_dict = {
     "watermark": "Watermark",
     "watermark_text": "Watermark Text",
     "watermark_duration": "Watermark Duration",
+    "watermark_size": "Watermark Font Size",
 }
 
 
@@ -803,6 +809,19 @@ async def set_custom(client, message, pre_event, key, direct=False):
             await DbManger().update_user_data(user_id)
         await sendMessage(message, f"✅ Watermark duration set to <b>{value}s</b>.")
         return
+    if key == "watermark_size":
+        try:
+            value = int(value.strip())
+            if value <= 0 or value > 200:
+                raise ValueError
+        except ValueError:
+            await sendMessage(message, "❌ Invalid size. Send a number between 1-200, e.g. <code>24</code>.")
+            return
+        update_user_ldata(user_id, "watermark_size", value)
+        if DATABASE_URL:
+            await DbManger().update_user_data(user_id)
+        await sendMessage(message, f"✅ Watermark font size set to <b>{value}px</b>.")
+        return
     if key in ["gofile", "streamtape"]:
         ddl_dict = user_dict.get("ddl_servers", {})
         mode, api = ddl_dict.get(key, [False, ""])
@@ -1214,6 +1233,7 @@ async def edit_user_settings(client, query):
         watermark_on = user_dict.get("watermark", False)
         watermark_text = user_dict.get("watermark_text", "")
         watermark_duration = user_dict.get("watermark_duration", 10)
+        watermark_size = user_dict.get("watermark_size", 24)
         wm_buttons = ButtonMaker()
         wm_buttons.ibutton(
             f"{'✅ ' if not watermark_on else ''}Off",
@@ -1231,13 +1251,18 @@ async def edit_user_settings(client, query):
             f"⏱ Duration [{watermark_duration}s]",
             f"userset {user_id} watermark_duration",
         )
+        wm_buttons.ibutton(
+            f"🔠 Font Size [{watermark_size}px]",
+            f"userset {user_id} watermark_size",
+        )
         wm_buttons.ibutton("Back", f"userset {user_id} leech", "footer")
         wm_buttons.ibutton("Close", f"userset {user_id} close", "footer")
         text = (
             f"㊂ <b><u>Watermark Settings :</u></b>\n\n"
             f"➲ <b>Status :</b> <i>{'ON' if watermark_on else 'OFF'}</i>\n"
             f"➲ <b>Text :</b> <code>{escape(watermark_text) if watermark_text else 'Not Set'}</code>\n"
-            f"➲ <b>Duration :</b> <i>{watermark_duration} seconds</i>\n\n"
+            f"➲ <b>Duration :</b> <i>{watermark_duration} seconds</i>\n"
+            f"➲ <b>Font Size :</b> <i>{watermark_size}px</i>\n\n"
             f"➲ <b>Description :</b> <i>When enabled, your text is burned onto the video "
             f"at the bottom-center (subtitle position), visible from the start for the configured duration.</i>"
         )
@@ -1257,6 +1282,7 @@ async def edit_user_settings(client, query):
             )
         update_user_ldata(user_id, "watermark", new_state)
         watermark_duration = user_dict.get("watermark_duration", 10)
+        watermark_size = user_dict.get("watermark_size", 24)
         wm_buttons = ButtonMaker()
         wm_buttons.ibutton(
             f"{'✅ ' if not new_state else ''}Off",
@@ -1274,13 +1300,18 @@ async def edit_user_settings(client, query):
             f"⏱ Duration [{watermark_duration}s]",
             f"userset {user_id} watermark_duration",
         )
+        wm_buttons.ibutton(
+            f"🔠 Font Size [{watermark_size}px]",
+            f"userset {user_id} watermark_size",
+        )
         wm_buttons.ibutton("Back", f"userset {user_id} leech", "footer")
         wm_buttons.ibutton("Close", f"userset {user_id} close", "footer")
         text = (
             f"㊂ <b><u>Watermark Settings :</u></b>\n\n"
             f"➲ <b>Status :</b> <i>{'ON' if new_state else 'OFF'}</i>\n"
             f"➲ <b>Text :</b> <code>{escape(watermark_text) if watermark_text else 'Not Set'}</code>\n"
-            f"➲ <b>Duration :</b> <i>{watermark_duration} seconds</i>\n\n"
+            f"➲ <b>Duration :</b> <i>{watermark_duration} seconds</i>\n"
+            f"➲ <b>Font Size :</b> <i>{watermark_size}px</i>\n\n"
             f"➲ <b>Description :</b> <i>When enabled, your text is burned onto the video "
             f"at the bottom-center (subtitle position), visible from the start for the configured duration.</i>"
         )
@@ -1306,6 +1337,18 @@ async def edit_user_settings(client, query):
         await sendMessage(
             message,
             "⏱ Send Watermark duration in seconds (e.g. <code>10</code>).\n"
+            "<b>Timeout:</b> 60 Sec.",
+        )
+        await event_handler(client, query, pfunc, rfunc)
+    elif data[2] == "watermark_size":
+        handler_dict[user_id] = False
+        await query.answer()
+        pfunc = partial(set_custom, pre_event=query, key="watermark_size")
+        rfunc = partial(update_user_settings, query, "watermark", "leech")
+        await sendMessage(
+            message,
+            "🔠 Send Watermark font size in pixels (e.g. <code>24</code>).\n"
+            "Recommended range: 16-40px for most videos.\n"
             "<b>Timeout:</b> 60 Sec.",
         )
         await event_handler(client, query, pfunc, rfunc)
