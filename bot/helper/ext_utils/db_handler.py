@@ -241,6 +241,27 @@ class DbManger:
         self.__conn.close
         return notifier_dict  # return a dict ==> {cid: {tag: [{_id: source}, {_id, source}, ...]}}
 
+    async def get_incomplete_tasks_raw(self):
+        """
+        Returns the raw, unflattened list of incomplete task rows:
+        [{"_id": link, "cid": cid, "tag": tag, "source": msg_link, "org_msg": msg}, ...]
+
+        Used by Auto Resume Task to re-fetch and replay each original
+        message individually. IMPORTANT: unlike get_incomplete_tasks(),
+        this does NOT drop the tasks table — it only reads. The table
+        is cleared per-task via rm_complete_task() as each resume
+        either succeeds (task re-added fresh on next download start)
+        or is confirmed permanently gone.
+        """
+        raw_tasks = []
+        if self.__err:
+            return raw_tasks
+        if await self.__db.tasks[bot_id].find_one():
+            rows = self.__db.tasks[bot_id].find({})
+            async for row in rows:
+                raw_tasks.append(row)
+        return raw_tasks
+
     async def trunc_table(self, name):
         if self.__err:
             return
@@ -250,3 +271,4 @@ class DbManger:
 
 if DATABASE_URL:
     bot_loop.run_until_complete(DbManger().db_load())
+                    
