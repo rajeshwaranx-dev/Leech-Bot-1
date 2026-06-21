@@ -100,12 +100,14 @@ def embed_mp4_thumbnail(file_path, image_path, output_path):
     return output_path
 
 
-async def auto_attachment_leech(up_dir, attachment_enabled, attachment_url=""):
+async def auto_attachment_leech(up_dir, attachment_enabled, attachment_url="", attachment_image=""):
     """
     Main entry point called from tasks_listener before TgUploader.
 
     attachment_enabled: bool, user's Attachment toggle
-    attachment_url: str, direct URL to the cover image
+    attachment_url: str, direct URL to the cover image (fallback)
+    attachment_image: str, local file path to an uploaded cover image
+                       (takes PRIORITY over attachment_url if both are set)
 
     For .mkv files: embeds a true attachment stream.
     For .mp4/.m4v files: embeds a thumbnail stream.
@@ -113,7 +115,9 @@ async def auto_attachment_leech(up_dir, attachment_enabled, attachment_url=""):
 
     Returns up_dir (files modified in-place, replacing originals).
     """
-    if not attachment_enabled or not attachment_url.strip():
+    if not attachment_enabled:
+        return up_dir
+    if not attachment_image and not attachment_url.strip():
         return up_dir
 
     all_files = []
@@ -126,13 +130,16 @@ async def auto_attachment_leech(up_dir, attachment_enabled, attachment_url=""):
     if not all_files:
         return up_dir
 
-    # Download the attachment image once, reuse for all files in this batch
-    temp_image = os.path.join(up_dir, "_attachment_cover.jpg")
-    downloaded = download_attachment_image(attachment_url, temp_image)
-
-    if not downloaded:
-        LOGGER.warning("Attachment: Could not download cover image, skipping attachment step.")
-        return up_dir
+    # Priority: uploaded image (local file) > URL download
+    if attachment_image and os.path.exists(attachment_image):
+        downloaded = attachment_image
+        LOGGER.info(f"Attachment: Using uploaded image '{attachment_image}'")
+    else:
+        temp_image = os.path.join(up_dir, "_attachment_cover.jpg")
+        downloaded = download_attachment_image(attachment_url, temp_image)
+        if not downloaded:
+            LOGGER.warning("Attachment: Could not download cover image, skipping attachment step.")
+            return up_dir
 
     LOGGER.info(f"Attachment: Applying cover to {len(all_files)} file(s)")
 
@@ -170,12 +177,15 @@ async def auto_attachment_leech(up_dir, attachment_enabled, attachment_url=""):
                         pass
             continue
 
-    # Clean up the downloaded cover image temp file
-    try:
-        if os.path.exists(temp_image):
-            os.remove(temp_image)
-    except Exception:
-        pass
+    # Clean up only the temp URL-downloaded cover image.
+    # NEVER delete the uploaded image (attachment_image) — it's the
+    # user's permanently saved file, reused across future leeches.
+    if downloaded != attachment_image:
+        try:
+            if os.path.exists(downloaded):
+                os.remove(downloaded)
+        except Exception:
+            pass
 
     return up_dir
-
+  
