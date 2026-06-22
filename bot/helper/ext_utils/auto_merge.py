@@ -87,32 +87,48 @@ def extract_episode_num(filename):
 
 def build_merged_filename(series_name, episodes):
     """
-    Build an output filename that preserves the original naming/quality/tags,
-    only replacing the single episode number with the merged range.
-    Falls back to '<series_name>_merged.mkv' if pattern can't be matched.
+    Build an output filename that preserves the original naming/quality/tags.
+
+    Strategy (in order of priority):
+    1. Use the PARENT FOLDER name if episodes live inside a named subfolder
+       (e.g. 'Gullak (2026) S05 EP (01-02) TRUE WEB-DL - 480p.../')
+       — this folder already has the full quality/language/size info.
+    2. Fall back to building from the first episode filename + episode range
+       if all episodes are in the root download dir (flat structure).
     """
-    first_file = Path(episodes[0]).name
+    first_file = episodes[0]
     ext = Path(first_file).suffix or ".mkv"
 
+    # --- Strategy 1: Use parent folder name ---
+    parent_dir = Path(first_file).parent
+    parent_name = parent_dir.name
+
+    # Check if the parent folder has a meaningful name (not just a number/temp dir)
+    # by verifying it contains episode/quality-related content
+    if parent_name and not parent_name.isdigit() and len(parent_name) > 5:
+        # Clean the folder name and use it as the merged filename
+        safe_name = re.sub(r'[<>:"|?*]', "_", parent_name).strip()
+        return f"{safe_name}{ext}"
+
+    # --- Strategy 2: Build from first episode filename + episode range ---
     first_ep = extract_episode_num(episodes[0])
     last_ep = extract_episode_num(episodes[-1])
+    first_stem = Path(first_file).name
 
-    # Try to replace the episode marker in the FIRST file's name with a range
-    # e.g. "...S01_EP_29...TRUE_WEB-DL..." -> "...S01_EP_29-32...TRUE_WEB-DL..."
+    # Try S##E## pattern
     ep_pattern = re.compile(r"(s\d+[\s_\-]?ep?[\s_\-]?)(\d+)", re.IGNORECASE)
-    match = ep_pattern.search(Path(first_file).stem)
-
+    match = ep_pattern.search(Path(first_stem).stem)
     if match and first_ep is not None and last_ep is not None:
-        stem = Path(first_file).stem
+        stem = Path(first_stem).stem
         range_str = f"{first_ep:02d}-{last_ep:02d}" if first_ep != last_ep else f"{first_ep:02d}"
         new_stem = ep_pattern.sub(rf"\g<1>{range_str}", stem, count=1)
         return new_stem + ext
 
-    # Fallback: try generic ep##  or e## replace anywhere
+    # Try EP## pattern
     ep_pattern2 = re.compile(r"(ep?)(\d+)", re.IGNORECASE)
-    match2 = ep_pattern2.search(Path(first_file).stem)
+    match2 = ep_pattern2.search(Path(first_stem).stem)
     if match2 and first_ep is not None and last_ep is not None:
-        stem = Path(first_file).stem
+        stem = Path(first_stem).stem
         range_str = f"{first_ep:02d}-{last_ep:02d}" if first_ep != last_ep else f"{first_ep:02d}"
         new_stem = ep_pattern2.sub(rf"\g<1>{range_str}", stem, count=1)
         return new_stem + ext
