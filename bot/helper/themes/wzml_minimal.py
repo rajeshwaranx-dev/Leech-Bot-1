@@ -280,7 +280,10 @@ class WZMLStyle:
 ┠<b> Save Mode :</b> <code>{SAVE_MODE}</code>
 ┖<b> User Bot PM :</b> <code>{BOT_PM}</code>
 
-❤️ <b>Powered by</b> <a href="https://t.me/AskBotz">@Askbotz</a> ❤️"""
+┏━━━━━━━━━━━━━━━━━━━━━━┓
+💖 <b>Powered by</b>
+🌟 <a href="https://t.me/AskBotz">AskBotz</a>
+┗━━━━━━━━━━━━━━━━━━━━━━┛"""
 
     MIRROR = """㊂ <b><u>Mirror/Clone Settings : {NAME}</u></b>
 
