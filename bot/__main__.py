@@ -426,6 +426,8 @@ async def main():
             & ~CustomFilters.blacklisted,
         )
     )
+    from bot.helper.telegram_helper.auto_leech import add_auto_leech_handlers
+    add_auto_leech_handlers(bot)
     LOGGER.info(f"WZML-X Bot [@{bot_name}] Started!")
     if user:
         LOGGER.info(f"WZ's User [@{user.me.username}] Ready!")

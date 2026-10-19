@@ -19,3 +19,4 @@ bot.session
 user.session
 terabox.txt
 rclone.conf
+venv/

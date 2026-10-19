@@ -1377,7 +1377,6 @@ async def edit_bot_settings(client, query):
         await query.answer()
         al_buttons = ButtonMaker()
         auto_leech_on = config_dict.get("AUTO_LEECH", False)
-        whitelist = config_dict.get("AUTO_LEECH_WHITELIST", "")
         al_buttons.ibutton(
             f"{'✅ ' if not auto_leech_on else ''}OFF",
             "botset setautoleech off",
@@ -1386,38 +1385,23 @@ async def edit_bot_settings(client, query):
             f"{'✅ ' if auto_leech_on else ''}ON",
             "botset setautoleech on",
         )
-        al_buttons.ibutton(
-            f"👥 Whitelist [{whitelist if whitelist else 'Not Set'}]",
-            "botset editvar AUTO_LEECH_WHITELIST edit",
-        )
         al_buttons.ibutton("Back", "botset back")
         al_buttons.ibutton("Close", "botset close")
-        whitelist_display = whitelist.replace(" ", ", ") if whitelist else "Not Set"
         text = (
             f"🤖 <b><u>Auto Leech Settings :</u></b>\n\n"
-            f"➲ <b>Status :</b> <code>{'ON' if auto_leech_on else 'OFF'}</code>\n"
-            f"➲ <b>Whitelist :</b> <code>{whitelist_display}</code>\n\n"
-            f"<i>When ON, .torrent files and magnet links sent by whitelisted users "
-            f"in authorized chats are auto-leeched without any command.\n\n"
-            f"Whitelist: space-separated Telegram user IDs.\n"
-            f"Example: <code>123456789 987654321</code></i>"
+            f"➲ <b>Status :</b> <code>{'ON' if auto_leech_on else 'OFF'}</code>\n\n"
+            f"<i>When ON, .torrent files and magnet links sent by "
+            f"authorized users in authorized chats are auto-leeched "
+            f"without any command.</i>"
         )
         await editMessage(message, text, al_buttons.build_menu(2))
     elif data[1] == "setautoleech":
         handler_dict[message.chat.id] = False
         new_state = data[2] == "on"
-        whitelist = config_dict.get("AUTO_LEECH_WHITELIST", "")
-        if new_state and not whitelist.strip():
-            await query.answer(
-                "⚠️ Set whitelist user IDs first before enabling Auto Leech!",
-                show_alert=True,
-            )
-            new_state = False
-        else:
-            await query.answer(
-                f"✅ Auto Leech turned {'ON' if new_state else 'OFF'}",
-                show_alert=False,
-            )
+        await query.answer(
+            f"✅ Auto Leech turned {'ON' if new_state else 'OFF'}",
+            show_alert=False,
+        )
         config_dict["AUTO_LEECH"] = new_state
         if DATABASE_URL:
             await DbManger().update_config({"AUTO_LEECH": new_state})
@@ -1430,21 +1414,14 @@ async def edit_bot_settings(client, query):
             f"{'✅ ' if new_state else ''}ON",
             "botset setautoleech on",
         )
-        al_buttons.ibutton(
-            f"👥 Whitelist [{whitelist if whitelist else 'Not Set'}]",
-            "botset editvar AUTO_LEECH_WHITELIST edit",
-        )
         al_buttons.ibutton("Back", "botset back")
         al_buttons.ibutton("Close", "botset close")
-        whitelist_display = whitelist.replace(" ", ", ") if whitelist else "Not Set"
         text = (
             f"🤖 <b><u>Auto Leech Settings :</u></b>\n\n"
-            f"➲ <b>Status :</b> <code>{'ON' if new_state else 'OFF'}</code>\n"
-            f"➲ <b>Whitelist :</b> <code>{whitelist_display}</code>\n\n"
-            f"<i>When ON, .torrent files and magnet links sent by whitelisted users "
-            f"in authorized chats are auto-leeched without any command.\n\n"
-            f"Whitelist: space-separated Telegram user IDs.\n"
-            f"Example: <code>123456789 987654321</code></i>"
+            f"➲ <b>Status :</b> <code>{'ON' if new_state else 'OFF'}</code>\n\n"
+            f"<i>When ON, .torrent files and magnet links sent by "
+            f"authorized users in authorized chats are auto-leeched "
+            f"without any command.</i>"
         )
         await editMessage(message, text, al_buttons.build_menu(2))
     elif data[1] == "boolvar":
