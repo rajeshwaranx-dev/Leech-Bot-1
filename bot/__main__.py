@@ -430,6 +430,8 @@ async def main():
     add_auto_leech_handlers(bot)
     LOGGER.info(f"WZML-X Bot [@{bot_name}] Started!")
     if user:
+        from bot.helper.ext_utils.tmv_scraper import register_tmv_scheduler
+        register_tmv_scheduler(scheduler)
         LOGGER.info(f"WZ's User [@{user.me.username}] Ready!")
     signal(SIGINT, exit_clean_up)
 
