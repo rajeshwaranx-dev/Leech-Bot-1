@@ -429,9 +429,11 @@ async def main():
     from bot.helper.telegram_helper.auto_leech import add_auto_leech_handlers
     add_auto_leech_handlers(bot)
     LOGGER.info(f"WZML-X Bot [@{bot_name}] Started!")
+    from bot.helper.ext_utils.tmv_scraper import register_tmv_scheduler
+    register_tmv_scheduler(scheduler)
+    from bot.modules.dtmv import add_dtmv_handlers
+    add_dtmv_handlers(bot)
     if user:
-        from bot.helper.ext_utils.tmv_scraper import register_tmv_scheduler
-        register_tmv_scheduler(scheduler)
         LOGGER.info(f"WZ's User [@{user.me.username}] Ready!")
     signal(SIGINT, exit_clean_up)
 
@@ -445,5 +447,8 @@ async def stop_signals():
 
 bot_run = bot.loop.run_until_complete
 bot_run(main())
-bot_run(idle())
+try:
+    bot_run(idle())
+except Exception:
+    pass
 bot_run(stop_signals())

@@ -490,6 +490,10 @@ async def load_config():
     TMV_SCRAPE_INTERVAL = environ.get("TMV_SCRAPE_INTERVAL", "")
     TMV_SCRAPE_INTERVAL = int(TMV_SCRAPE_INTERVAL) if TMV_SCRAPE_INTERVAL.isdigit() else 300
 
+    TMV_CHAT = environ.get("TMV_CHAT", "").strip()
+    if TMV_CHAT.lstrip("-").isdigit():
+        TMV_CHAT = int(TMV_CHAT)
+
     USER_MAX_TASKS = environ.get("USER_MAX_TASKS", "")
     USER_MAX_TASKS = int(USER_MAX_TASKS) if USER_MAX_TASKS.isdigit() else ""
 
@@ -721,6 +725,7 @@ async def load_config():
             "TMV_SIZE_LIMIT": TMV_SIZE_LIMIT,
             "TMV_CAM_PREDVD": TMV_CAM_PREDVD,
             "TMV_SCRAPE_INTERVAL": TMV_SCRAPE_INTERVAL,
+            "TMV_CHAT": TMV_CHAT,
             "STORAGE_THRESHOLD": STORAGE_THRESHOLD,
             "TORRENT_LIMIT": TORRENT_LIMIT,
             "DIRECT_LIMIT": DIRECT_LIMIT,
@@ -965,6 +970,14 @@ async def edit_variable(_, message, pre_message, key):
     if key == "RSS_DELAY":
         value = int(value)
         addJob(value)
+    elif key == "TMV_CHAT":
+        value = value.strip()
+        if value.lstrip("-").isdigit():
+            value = int(value)
+    elif key == "TMV_SIZE_LIMIT":
+        value = int(value) if value.strip().isdigit() else 0
+    elif key == "TMV_SCRAPE_INTERVAL":
+        value = int(value) if value.strip().isdigit() else 300
     elif key == "DOWNLOAD_DIR":
         if not value.endswith("/"):
             value += "/"
@@ -1512,6 +1525,7 @@ async def edit_bot_settings(client, query):
             f"⏱ Interval [{tmv_interval}s]",
             "botset editvar TMV_SCRAPE_INTERVAL edit",
         )
+        tmv_buttons.ibutton(f"💬 TMV Chat [{config_dict.get('TMV_CHAT') or 'PM'}]", "botset editvar TMV_CHAT edit")
         tmv_buttons.ibutton("Back", "botset back")
         tmv_buttons.ibutton("Close", "botset close")
         text = (
@@ -1521,7 +1535,8 @@ async def edit_bot_settings(client, query):
             f"➲ <b>Language :</b> <code>{tmv_lang}</code>\n"
             f"➲ <b>Size Limit :</b> <code>{f'{tmv_size}GB' if tmv_size else 'No Limit'}</code>\n"
             f"➲ <b>CAM/PreDVD :</b> <code>{'ON (taken)' if tmv_cam else 'OFF (skipped)'}</code>\n"
-            f"➲ <b>Scrape Interval :</b> <code>{tmv_interval}s</code>\n\n"
+            f"➲ <b>Scrape Interval :</b> <code>{tmv_interval}s</code>\n"
+            f"➲ <b>TMV Chat :</b> <code>{config_dict.get('TMV_CHAT') or 'Owner PM'}</code>\n\n"
             f"<i>Language options: <code>all</code>, <code>tamil</code>, <code>hindi</code>, "
             f"<code>telugu</code>, <code>malayalam</code>, <code>kannada</code>, "
             f"<code>english</code>, <code>tamil+multi</code>, <code>multi</code>\n"
@@ -1563,6 +1578,7 @@ async def edit_bot_settings(client, query):
         )
         tmv_buttons.ibutton("🔗 TMV URL", "botset editvar TMV_URL edit")
         tmv_buttons.ibutton(f"⏱ Interval [{tmv_interval}s]", "botset editvar TMV_SCRAPE_INTERVAL edit")
+        tmv_buttons.ibutton(f"💬 TMV Chat [{config_dict.get('TMV_CHAT') or 'PM'}]", "botset editvar TMV_CHAT edit")
         tmv_buttons.ibutton("Back", "botset back")
         tmv_buttons.ibutton("Close", "botset close")
         text = (
@@ -1572,7 +1588,8 @@ async def edit_bot_settings(client, query):
             f"➲ <b>Language :</b> <code>{tmv_lang}</code>\n"
             f"➲ <b>Size Limit :</b> <code>{f'{tmv_size}GB' if tmv_size else 'No Limit'}</code>\n"
             f"➲ <b>CAM/PreDVD :</b> <code>{'ON (taken)' if tmv_cam else 'OFF (skipped)'}</code>\n"
-            f"➲ <b>Scrape Interval :</b> <code>{tmv_interval}s</code>\n\n"
+            f"➲ <b>Scrape Interval :</b> <code>{tmv_interval}s</code>\n"
+            f"➲ <b>TMV Chat :</b> <code>{config_dict.get('TMV_CHAT') or 'Owner PM'}</code>\n\n"
             f"<i>Language options: <code>all</code>, <code>tamil</code>, <code>hindi</code>, "
             f"<code>telugu</code>, <code>malayalam</code>, <code>kannada</code>, "
             f"<code>english</code>, <code>tamil+multi</code>, <code>multi</code>\n"

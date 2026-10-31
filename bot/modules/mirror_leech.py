@@ -290,6 +290,8 @@ async def _mirror_leech(
                 link = reply_text
         elif reply_to.document and (
             file_.mime_type == "application/x-bittorrent"
+            or file_.mime_type == "application/x-torrent"
+            or file_.mime_type == "application/octet-stream" and file_.file_name.endswith(".torrent")
             or file_.file_name.endswith(".torrent")
         ):
             link = await reply_to.download()

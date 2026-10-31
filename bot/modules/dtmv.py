@@ -48,24 +48,38 @@ def _clean_title(raw):
     title = re.sub(r'\s+', ' ', title).strip()
     return title or raw
 
+def _title_from_url(url):
+    """Extract clean movie title from TamilMV topic URL slug."""
+    import re as _re
+    # URL like: /forums/topic/200528-baththa-2026-tamil-web
+    match = _re.search(r'/topic/\d+-([^/]+)', url)
+    if not match:
+        return None
+    slug = match.group(1)
+    # Remove trailing quality/source tags
+    slug = _re.sub(r'-(true|web|hd|hq|blu|dvd|cam|pre|rip|dl|hevc|avc|x264|x265|esub|multi|tamil|telugu|hindi|eng|mal|kan).*$', '', slug, flags=_re.I)
+    # Convert hyphens to spaces and title case
+    title = slug.replace('-', ' ').strip().title()
+    return title if len(title) > 2 else None
+
 
 async def _fetch_movies():
     """
-    Scrape TamilMV main page and return list of {title, url} dicts.
-    Groups by topic — one entry per movie/show.
+    Scrape TamilMV. Fetches full title from each topic page title tag.
+    10 concurrent requests per batch — fast enough for pagination.
     """
+    import asyncio as _asyncio
     from bot.helper.ext_utils.tmv_scraper import _find_working_domain
     tmv_url = await _find_working_domain()
     if not tmv_url:
         return []
     scraper = _scraper()
-    movies = []
     seen_urls = set()
+    raw_urls = []
 
     try:
-        resp = await asyncio.to_thread(scraper.get, tmv_url, timeout=30)
+        resp = await _asyncio.to_thread(scraper.get, tmv_url, timeout=30)
         soup = BeautifulSoup(resp.text, "html.parser")
-
         for a in soup.find_all("a", href=True):
             href = a["href"]
             if "topic" not in href:
@@ -73,17 +87,48 @@ async def _fetch_movies():
             url = _fix_url(href, tmv_url)
             if url in seen_urls:
                 continue
-            seen_urls.add(url)
-            title = _clean_title(a.get_text(strip=True))
-            if not title or len(title) < 5:
+            text = a.get_text(strip=True)
+            if not text or len(text) < 5 or text == "Languages":
                 continue
-            movies.append({"title": title, "url": url})
-
+            seen_urls.add(url)
+            raw_urls.append(url)
     except Exception as e:
         LOGGER.error(f"DTMV: fetch_movies error: {e}")
+        return []
 
-    return movies[:100]  # cap at 100
+    raw_urls = raw_urls[:100]
 
+    async def fetch_title(url):
+        try:
+            r = await _asyncio.to_thread(scraper.get, url, timeout=15)
+            s = BeautifulSoup(r.text, "html.parser")
+            if s.title:
+                full = s.title.get_text(strip=True)
+                title = re.sub(r'\s*[-|]\s*1TamilMV.*$', '', full, flags=re.I).strip()
+                return {"title": title, "url": url}
+        except Exception:
+            pass
+        return None
+
+    movies = []
+    batch_size = 10
+    for i in range(0, len(raw_urls), batch_size):
+        batch = raw_urls[i:i+batch_size]
+        results = await _asyncio.gather(*[fetch_title(u) for u in batch])
+        for r in results:
+            if r:
+                movies.append(r)
+        if len(movies) >= 100:
+            break
+
+    seen = set()
+    unique = []
+    for m in movies:
+        if m["url"] not in seen:
+            seen.add(m["url"])
+            unique.append(m)
+
+    return unique[:100]
 
 async def _fetch_torrents(topic_url):
     """
@@ -294,11 +339,20 @@ async def dtmv_callback(client: Client, query: CallbackQuery):
                         if lprefix:
                             clean_name = f"{lprefix} {clean_name}"
 
+                        # Rename file to use prefix + clean name before sending
+                        import os as _os
+                        clean_file_name = clean_name if clean_name.lower().endswith(".torrent") else clean_name + ".torrent"
+                        clean_file_name = re.sub(r'[\\/*?:"<>|]', "_", clean_file_name)
+                        clean_path = f"/tmp/{clean_file_name[:100]}"
+                        if _os.path.exists(path):
+                            _os.rename(path, clean_path)
+                            path = clean_path
+
                         # Send torrent to chat — gets unique message ID per torrent
                         sent_doc = await bot.send_document(
                             chat_id=chat_id,
                             document=path,
-                            caption=f"<code>{clean_name}</code>",
+                            caption=f"<b>{clean_name}</b>",
                             force_document=True,
                         )
                         sent_count += 1
@@ -311,7 +365,7 @@ async def dtmv_callback(client: Client, query: CallbackQuery):
                             isQbit=True,
                             tag=query.from_user.mention,
                             source_url=torrent["url"],
-                            leech_utils={"screenshots": 0, "thumb": thumb},
+                            leech_utils={"screenshots": 0, "thumb": None},
                         )
                         dl_path = f"{DOWNLOAD_DIR}{listener.uid}/"
                         await add_qb_torrent(path, dl_path, listener, None, None)
@@ -321,10 +375,25 @@ async def dtmv_callback(client: Client, query: CallbackQuery):
                     except Exception as e:
                         LOGGER.error(f"DTMV: Leech trigger failed for '{torrent['name'][:50]}': {e}")
                 else:
-                    # Auto Leech OFF — send torrent file to chat (no caption to avoid breaking manual /qbleech)
+                    # Auto Leech OFF — clean filename + bold caption
+                    import os as _os
+                    from bot import user_data as _ud
+                    _udict = _ud.get(query.from_user.id, {})
+                    _lprefix = _udict.get("lprefix", config_dict.get("LEECH_FILENAME_PREFIX", ""))
+                    _clean = re.sub(r'^(www\.\S+\s*[-–]\s*)', '', torrent["name"]).strip()
+                    if _lprefix:
+                        _clean = f"{_lprefix} {_clean}"
+                    _fname = re.sub(r'[\\/*?:"<>|]', "_", _clean)
+                    if not _fname.lower().endswith(".torrent"):
+                        _fname += ".torrent"
+                    _cpath = f"/tmp/{_fname[:100]}"
+                    if _os.path.exists(path):
+                        _os.rename(path, _cpath)
+                        path = _cpath
                     await bot.send_document(
                         chat_id=chat_id,
                         document=path,
+                        caption=f"<b>{_clean}</b>",
                         force_document=True,
                     )
                     sent_count += 1

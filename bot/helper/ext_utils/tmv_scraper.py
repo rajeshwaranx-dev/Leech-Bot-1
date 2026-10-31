@@ -12,7 +12,7 @@ import requests
 import cloudscraper
 from bs4 import BeautifulSoup
 from urllib.parse import unquote, urljoin
-from bot import LOGGER, config_dict
+from bot import LOGGER, config_dict, user_data
 from bot.helper.ext_utils.db_handler import DbManger
 
 # TamilMV permanent redirect domain — always redirects to current official domain
@@ -221,61 +221,88 @@ def download_torrent(scraper, url, filename):
 
 # --- DB helpers (uses leech bot's existing MongoDB connection) ---
 
-async def is_tmv_processed(file_url):
-    """Check if torrent already processed — uses leech bot's DB."""
+import json
+import time
+
+STORE_FILE = "tmv_processed.json"
+_processed = set()
+try:
+    with open(STORE_FILE) as _f:
+        _processed = set(json.load(_f))
+    _baseline_initial = False
+except Exception:
+    _baseline_initial = True
+_baseline_deadline = None
+
+
+def _save_processed():
     try:
-        db = DbManger()
-        result = await db.db.tamilmv.find_one({"file_url": file_url})
-        return result is not None
+        with open(STORE_FILE, "w") as f:
+            json.dump(sorted(_processed), f)
     except Exception as e:
-        LOGGER.error(f"TMVScraper: DB check failed: {e}")
-        return False
+        LOGGER.error(f"TMVScraper: Could not save processed list: {e}")
+
+
+async def is_tmv_processed(file_url):
+    global _baseline_deadline
+    if file_url in _processed:
+        return True
+    if _baseline_initial:
+        if _baseline_deadline is None:
+            _baseline_deadline = time.time() + 600
+        if time.time() < _baseline_deadline:
+            _processed.add(file_url)
+            _save_processed()
+            return True
+    return False
+
 
 async def mark_tmv_processed(file_name, file_url, size_mb, category):
-    """Save processed torrent to DB."""
-    import datetime
-    try:
-        db = DbManger()
-        await db.db.tamilmv.insert_one({
-            "file_name": file_name,
-            "file_url": file_url,
-            "size_mb": size_mb,
-            "category": category,
-            "upload_date": datetime.date.today().isoformat(),
-        })
-    except Exception as e:
-        LOGGER.error(f"TMVScraper: DB save failed: {e}")
+    _processed.add(file_url)
+    _save_processed()
 
-# --- Core scraper ---
 
 async def process_torrent(client, file_path, title, file_url, size_mb, category):
     """
-    Trigger leech directly via _mirror_leech — no Telegram message needed.
-    Creates a fake message object that _mirror_leech can process.
+    Send torrent to owner PM and trigger qBittorrent leech directly.
     """
-    from bot.modules.mirror_leech import _mirror_leech
-    from bot.helper.telegram_helper.bot_commands import BotCommands
-    from bot import bot, OWNER_ID
+    from bot import bot, OWNER_ID, DOWNLOAD_DIR
+    from bot.helper.mirror_utils.download_utils.qbit_download import add_qb_torrent
+    from bot.helper.listeners.tasks_listener import MirrorLeechListener
+    from aiofiles.os import path as aiopath
 
     try:
-        # Build a minimal fake message that _mirror_leech can handle
-        # We send the torrent file to the owner's PM first to get a real message object
-        cmd = f"/{BotCommands.QbLeechCommand[0]}"
+        owner_user = await bot.get_users(OWNER_ID)
+        target_chat = config_dict.get("TMV_CHAT") or os.environ.get("TMV_CHAT", "")
+        if isinstance(target_chat, str):
+            target_chat = target_chat.strip()
+            if target_chat.lstrip("-").isdigit():
+                target_chat = int(target_chat)
+        if not target_chat:
+            target_chat = OWNER_ID
+        lprefix = user_data.get(OWNER_ID, {}).get("lprefix", config_dict.get("LEECH_FILENAME_PREFIX", ""))
+        thumb_path = f"Thumbnails/{OWNER_ID}.jpg"
+        thumb = thumb_path if await aiopath.exists(thumb_path) else None
+        clean_title = f"{lprefix} {title}" if lprefix else title
 
-        # Send torrent file to owner PM silently — this gives us a real Pyrogram message
         sent_msg = await bot.send_document(
-            chat_id=OWNER_ID,
+            chat_id=target_chat,
             document=file_path,
-            caption=f"#AutoTMV {category}\n{title}",
+            caption=f"<b>{clean_title}</b>\n\n#{category} #AutoTMV",
+            force_document=True,
         )
+        sent_msg.from_user = owner_user
 
-        # Reply with the command — this creates the reply_to_message pattern
-        cmd_msg = await sent_msg.reply(cmd)
-        cmd_msg = await bot.get_messages(OWNER_ID, cmd_msg.id)
-        cmd_msg.from_user = await bot.get_users(OWNER_ID)
-
-        await _mirror_leech(bot, cmd_msg, isQbit=True, isLeech=True)
-
+        listener = MirrorLeechListener(
+            message=sent_msg,
+            isLeech=True,
+            isQbit=True,
+            tag=owner_user.mention,
+            source_url=file_url,
+            leech_utils={"screenshots": 0, "thumb": None},
+        )
+        dl_path = f"{DOWNLOAD_DIR}{listener.uid}/"
+        await add_qb_torrent(file_path, dl_path, listener, None, None)
         await mark_tmv_processed(title, file_url, size_mb, category)
         LOGGER.info(f"TMVScraper: Leech triggered for: {title[:60]}")
 
@@ -300,7 +327,7 @@ async def tmv_scraper_job():
     scraper = cloudscraper.create_scraper()
 
     try:
-        resp = scraper.get(tmv_url, timeout=30)
+        resp = await asyncio.to_thread(scraper.get, tmv_url, timeout=30)
         soup = BeautifulSoup(resp.text, "html.parser")
         topics = [
             fix_url(a["href"], tmv_url)
@@ -313,7 +340,7 @@ async def tmv_scraper_job():
         for topic_url in topics:
             await asyncio.sleep(random.uniform(2, 4))
             try:
-                topic_html = scraper.get(topic_url, timeout=30).text
+                topic_html = (await asyncio.to_thread(scraper.get, topic_url, timeout=30)).text
                 topic_soup = BeautifulSoup(topic_html, "html.parser")
                 posts = topic_soup.find_all("div", class_="cPost_contentWrap")
 
