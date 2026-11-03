@@ -262,7 +262,7 @@ async def mark_tmv_processed(file_name, file_url, size_mb, category):
     _save_processed()
 
 
-async def process_torrent(client, file_path, title, file_url, size_mb, category):
+async def process_torrent(client, file_path, title, file_url, size_mb, category, topic_url=None, topic_title=""):
     """
     Send torrent to owner PM and trigger qBittorrent leech directly.
     """
@@ -301,6 +301,11 @@ async def process_torrent(client, file_path, title, file_url, size_mb, category)
             source_url=file_url,
             leech_utils={"screenshots": 0, "thumb": None},
         )
+        try:
+            from bot.helper.ext_utils.post_tracker import start_movie, tag_listener
+            tag_listener(listener, start_movie(topic_url, topic_title), title, size_mb)
+        except Exception as e:
+            LOGGER.error(f"PostTracker: tag failed: {e}")
         dl_path = f"{DOWNLOAD_DIR}{listener.uid}/"
         await add_qb_torrent(file_path, dl_path, listener, None, None)
         await mark_tmv_processed(title, file_url, size_mb, category)
@@ -343,6 +348,10 @@ async def tmv_scraper_job():
                 topic_html = (await asyncio.to_thread(scraper.get, topic_url, timeout=30)).text
                 topic_soup = BeautifulSoup(topic_html, "html.parser")
                 posts = topic_soup.find_all("div", class_="cPost_contentWrap")
+                try:
+                    topic_title = re.sub(r"\s*[-|]\s*1TamilMV.*$", "", topic_soup.title.get_text(strip=True), flags=re.I).strip()
+                except Exception:
+                    topic_title = ""
 
                 for post in posts:
                     for a in post.find_all("a", href=True):
@@ -376,7 +385,7 @@ async def tmv_scraper_job():
 
                         if await asyncio.to_thread(download_torrent, scraper, href, tmp_path):
                             LOGGER.info(f"TMVScraper: [{category}] Processing: {link_text[:80]}")
-                            await process_torrent(None, tmp_path, link_text, href, size_mb, category)
+                            await process_torrent(None, tmp_path, link_text, href, size_mb, category, topic_url, topic_title)
                         else:
                             LOGGER.warning(f"TMVScraper: Download failed: {link_text[:60]}")
 
@@ -399,6 +408,22 @@ def register_tmv_scheduler(scheduler):
         trigger="interval",
         seconds=interval,
         id="tmv_scraper",
+        replace_existing=True,
+    )
+    from bot.helper.ext_utils.auto_poster import auto_post_job
+    scheduler.add_job(
+        auto_post_job,
+        trigger="interval",
+        seconds=60,
+        id="auto_poster",
+        replace_existing=True,
+    )
+    from bot.helper.ext_utils.disk_guard import disk_guard_job
+    scheduler.add_job(
+        disk_guard_job,
+        trigger="interval",
+        seconds=1800,
+        id="disk_guard",
         replace_existing=True,
     )
     LOGGER.info(f"TMVScraper: Scheduled every {interval}s")

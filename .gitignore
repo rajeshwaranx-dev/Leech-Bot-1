@@ -26,3 +26,7 @@ terabox.txt
 tmv_processed.json
 user.session
 venv/
+*.bak_*
+post_tracker.json*
+post_stickers.json
+qBittorrent/

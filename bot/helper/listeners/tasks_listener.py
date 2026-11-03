@@ -675,6 +675,26 @@ class MirrorLeechListener:
         )
         msg += BotTheme("MODE", Mode=self.upload_details["mode"])
         LOGGER.info(f"Task Done: {name}")
+        if getattr(self, "post_key", None):
+            try:
+                from bot.helper.ext_utils.post_tracker import record_done
+                record_done(
+                    self.post_key,
+                    name,
+                    size,
+                    getattr(self, "post_msgs", []),
+                    getattr(self, "post_tname", ""),
+                    getattr(self, "post_size_mb", 0),
+                )
+            except Exception as e:
+                LOGGER.error(f"PostTracker: record_done failed: {e}")
+        if getattr(self, "post_key", None) and config_dict.get("AUTO_LEECH_CHANNEL"):
+            try:
+                import asyncio as _aio
+                from bot.helper.ext_utils.auto_poster import dump_files
+                _aio.create_task(dump_files(list(getattr(self, "post_msgs", []))))
+            except Exception as e:
+                LOGGER.error(f"AutoPost: dump start failed: {e}")
 
         buttons = ButtonMaker()
         if self.isLeech:
@@ -956,6 +976,12 @@ class MirrorLeechListener:
         await delete_links(self.message)
 
     async def onDownloadError(self, error, button=None):
+        if getattr(self, "post_key", None):
+            try:
+                from bot.helper.ext_utils.post_tracker import record_fail
+                record_fail(self.post_key, getattr(self, "post_tname", ""))
+            except Exception:
+                pass
         async with download_dict_lock:
             if self.uid in download_dict.keys():
                 del download_dict[self.uid]
@@ -1001,6 +1027,12 @@ class MirrorLeechListener:
             await clean_download(self.newDir)
 
     async def onUploadError(self, error):
+        if getattr(self, "post_key", None):
+            try:
+                from bot.helper.ext_utils.post_tracker import record_fail
+                record_fail(self.post_key, getattr(self, "post_tname", ""))
+            except Exception:
+                pass
         async with download_dict_lock:
             if self.uid in download_dict.keys():
                 del download_dict[self.uid]

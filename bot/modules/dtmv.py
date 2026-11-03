@@ -367,6 +367,11 @@ async def dtmv_callback(client: Client, query: CallbackQuery):
                             source_url=torrent["url"],
                             leech_utils={"screenshots": 0, "thumb": None},
                         )
+                        try:
+                            from bot.helper.ext_utils.post_tracker import start_movie, tag_listener
+                            tag_listener(listener, start_movie(movie["url"], movie["title"]), torrent["name"], 0)
+                        except Exception as e:
+                            LOGGER.error(f"PostTracker: tag failed: {e}")
                         dl_path = f"{DOWNLOAD_DIR}{listener.uid}/"
                         await add_qb_torrent(path, dl_path, listener, None, None)
                         LOGGER.info(f"DTMV: qBit leech triggered for: {clean_name[:50]}")

@@ -494,6 +494,30 @@ async def load_config():
     if TMV_CHAT.lstrip("-").isdigit():
         TMV_CHAT = int(TMV_CHAT)
 
+    def _pid(name):
+        v = environ.get(name, "").strip()
+        return int(v) if v.lstrip("-").isdigit() else ""
+
+    def _pb(name):
+        return environ.get(name, "False").strip().lower() == "true"
+
+    AUTO_POST = _pb("AUTO_POST")
+    POSTER_CHANNEL = _pid("POSTER_CHANNEL")
+    AUTO_LEECH_CHANNEL = _pid("AUTO_LEECH_CHANNEL")
+    BACKUP_CHANNEL = _pid("BACKUP_CHANNEL")
+    BACKUP_POST = _pb("BACKUP_POST")
+    LINKS_BACKUP_CHANNEL = _pid("LINKS_BACKUP_CHANNEL")
+    LINKS_BACKUP = _pb("LINKS_BACKUP")
+    QB_AUTO_POST = _pb("QB_AUTO_POST")
+    F2L_POST = _pb("F2L_POST")
+    F2L_CAPTION = environ.get("F2L_CAPTION", "")
+    TMDB_API_KEY = environ.get("TMDB_API_KEY", "").strip()
+    STICKER_1 = environ.get("STICKER_1", "").strip()
+    POSTER_WATERMARK = environ.get("POSTER_WATERMARK", "").strip()
+    STICKER_2 = environ.get("STICKER_2", "").strip()
+    POST_TIMEOUT = environ.get("POST_TIMEOUT", "")
+    POST_TIMEOUT = int(POST_TIMEOUT) if POST_TIMEOUT.isdigit() else 60
+
     USER_MAX_TASKS = environ.get("USER_MAX_TASKS", "")
     USER_MAX_TASKS = int(USER_MAX_TASKS) if USER_MAX_TASKS.isdigit() else ""
 
@@ -726,6 +750,21 @@ async def load_config():
             "TMV_CAM_PREDVD": TMV_CAM_PREDVD,
             "TMV_SCRAPE_INTERVAL": TMV_SCRAPE_INTERVAL,
             "TMV_CHAT": TMV_CHAT,
+            "AUTO_POST": AUTO_POST,
+            "POSTER_CHANNEL": POSTER_CHANNEL,
+            "AUTO_LEECH_CHANNEL": AUTO_LEECH_CHANNEL,
+            "BACKUP_CHANNEL": BACKUP_CHANNEL,
+            "BACKUP_POST": BACKUP_POST,
+            "LINKS_BACKUP_CHANNEL": LINKS_BACKUP_CHANNEL,
+            "LINKS_BACKUP": LINKS_BACKUP,
+            "QB_AUTO_POST": QB_AUTO_POST,
+            "F2L_POST": F2L_POST,
+            "F2L_CAPTION": F2L_CAPTION,
+            "TMDB_API_KEY": TMDB_API_KEY,
+            "STICKER_1": STICKER_1,
+            "POSTER_WATERMARK": POSTER_WATERMARK,
+            "STICKER_2": STICKER_2,
+            "POST_TIMEOUT": POST_TIMEOUT,
             "STORAGE_THRESHOLD": STORAGE_THRESHOLD,
             "TORRENT_LIMIT": TORRENT_LIMIT,
             "DIRECT_LIMIT": DIRECT_LIMIT,
@@ -827,6 +866,21 @@ async def load_config():
     await gather(initiate_search_tools(), start_from_queued(), rclone_serve_booter())
 
 
+_BACK_TARGETS = {
+    "botset autopost": {
+        "AUTO_POST", "POSTER_CHANNEL", "AUTO_LEECH_CHANNEL", "BACKUP_CHANNEL",
+        "BACKUP_POST", "LINKS_BACKUP_CHANNEL", "LINKS_BACKUP", "QB_AUTO_POST",
+        "F2L_POST", "F2L_CAPTION", "TMDB_API_KEY", "POST_TIMEOUT",
+        "POSTER_WATERMARK", "STICKER_1", "STICKER_2",
+    },
+    "botset tmvsettings": {
+        "AUTO_TMV", "TMV_LANGUAGE", "TMV_SIZE_LIMIT", "TMV_CAM_PREDVD",
+        "TMV_URL", "TMV_SCRAPE_INTERVAL", "TMV_CHAT",
+    },
+    "botset autoleech": {"AUTO_LEECH", "AUTO_LEECH_WHITELIST"},
+}
+
+
 async def get_buttons(key=None, edit_type=None, edit_mode=None, mess=None):
     buttons = ButtonMaker()
     if key is None:
@@ -843,6 +897,10 @@ async def get_buttons(key=None, edit_type=None, edit_mode=None, mess=None):
         buttons.ibutton(
             f"🎬 TMV Settings [{'ON' if auto_tmv_on else 'OFF'}]",
             "botset tmvsettings",
+        )
+        buttons.ibutton(
+            f"📮 Auto Post [{'ON' if config_dict.get('AUTO_POST') else 'OFF'}]",
+            "botset autopost",
         )
         buttons.ibutton("Close", "botset close")
         msg = "<b><i>Bot Settings:</i></b>"
@@ -909,7 +967,12 @@ async def get_buttons(key=None, edit_type=None, edit_mode=None, mess=None):
             buttons.ibutton(
                 "View Var Value", f"botset showvar {key}", position="header"
             )
-        buttons.ibutton("Back", "botset back var", position="footer")
+        _back = "botset back var"
+        for _target, _keys in _BACK_TARGETS.items():
+            if key in _keys:
+                _back = _target
+                break
+        buttons.ibutton("Back", _back, position="footer")
         if key not in bool_vars:
             if not edit_mode:
                 buttons.ibutton("Edit Value", f"botset editvar {key} edit")
@@ -959,9 +1022,111 @@ async def get_buttons(key=None, edit_type=None, edit_mode=None, mess=None):
     return msg, button
 
 
+def _autopost_panel():
+    g = config_dict.get
+
+    def tog(label, k):
+        on = bool(g(k, False))
+        return f"{'✅ ' if on else '❌ '}{label}: {'ON' if on else 'OFF'}"
+
+    def val(k):
+        v = g(k)
+        return v if v not in (None, "", 0) else "Not set"
+
+    b = ButtonMaker()
+    b.ibutton(tog("Auto Post", "AUTO_POST"), "botset setpost AUTO_POST")
+    b.ibutton(tog("QB Auto Post", "QB_AUTO_POST"), "botset setpost QB_AUTO_POST")
+    b.ibutton(f"🖼 Poster Channel [{val('POSTER_CHANNEL')}]", "botset editvar POSTER_CHANNEL edit")
+    b.ibutton(f"📥 Auto Leech Channel [{val('AUTO_LEECH_CHANNEL')}]", "botset editvar AUTO_LEECH_CHANNEL edit")
+    b.ibutton(f"💾 Backup Channel [{val('BACKUP_CHANNEL')}]", "botset editvar BACKUP_CHANNEL edit")
+    b.ibutton(tog("Backup", "BACKUP_POST"), "botset setpost BACKUP_POST")
+    b.ibutton(f"🔗 Links Backup Ch [{val('LINKS_BACKUP_CHANNEL')}]", "botset editvar LINKS_BACKUP_CHANNEL edit")
+    b.ibutton(tog("Links Backup", "LINKS_BACKUP"), "botset setpost LINKS_BACKUP")
+    b.ibutton(tog("F2L", "F2L_POST"), "botset setpost F2L_POST")
+    b.ibutton("📝 F2L Caption", "botset editvar F2L_CAPTION edit")
+    b.ibutton(f"🎞 TMDB Key [{'set' if g('TMDB_API_KEY') else 'Not set'}]", "botset editvar TMDB_API_KEY edit")
+    b.ibutton(f"⏳ Post Timeout [{g('POST_TIMEOUT', 60)} min]", "botset editvar POST_TIMEOUT edit")
+    b.ibutton(f"🖼 Poster Watermark [{g('POSTER_WATERMARK') or 'Not set'}]", "botset editvar POSTER_WATERMARK edit")
+    b.ibutton(f"🎭 Sticker 1 [{'set' if g('STICKER_1') else 'Not set'}]", "botset setsticker 1")
+    b.ibutton(f"🎭 Sticker 2 [{'set' if g('STICKER_2') else 'Not set'}]", "botset setsticker 2")
+    b.ibutton("Back", "botset back")
+    b.ibutton("Close", "botset close")
+    text = (
+        "📮 <b><u>Auto Post Settings :</u></b>\n\n"
+        f"➲ <b>Auto Post :</b> <code>{'ON' if g('AUTO_POST') else 'OFF'}</code>\n"
+        f"➲ <b>Poster Channel :</b> <code>{val('POSTER_CHANNEL')}</code>\n"
+        f"➲ <b>Auto Leech Channel (raw dump) :</b> <code>{val('AUTO_LEECH_CHANNEL')}</code>\n"
+        f"➲ <b>Backup Channel :</b> <code>{val('BACKUP_CHANNEL')}</code> "
+        f"[{'ON' if g('BACKUP_POST') else 'OFF'}]\n"
+        f"➲ <b>Links Backup :</b> <code>{val('LINKS_BACKUP_CHANNEL')}</code> "
+        f"[{'ON' if g('LINKS_BACKUP') else 'OFF'}]\n"
+        f"➲ <b>QB Auto Post :</b> <code>{'ON' if g('QB_AUTO_POST') else 'OFF'}</code>\n"
+        f"➲ <b>F2L :</b> <code>{'ON' if g('F2L_POST') else 'OFF'}</code>\n"
+        f"➲ <b>TMDB Key :</b> <code>{'set' if g('TMDB_API_KEY') else 'Not set'}</code>\n"
+        f"➲ <b>Post Timeout :</b> <code>{g('POST_TIMEOUT', 60)} min</code>\n\n"
+        "<i>Channel IDs: send like -100123456789. Send 0 to clear.\n"
+        "Sticker 1 goes after the poster, sticker 2 after the files.</i>"
+    )
+    return text, b.build_menu(2)
+
+
 async def update_buttons(message, key=None, edit_type=None, edit_mode=None):
     msg, button = await get_buttons(key, edit_type, edit_mode, message)
     await editMessage(message, msg, button)
+
+
+async def _sticker_handler(client, query, pfunc, rfunc):
+    chat_id = query.message.chat.id
+    handler_dict[chat_id] = True
+    start_time = time()
+
+    async def event_filter(_, __, event):
+        user = event.from_user or event.sender_chat
+        return bool(
+            user.id == query.from_user.id
+            and event.chat.id == chat_id
+            and (event.sticker or event.text)
+        )
+
+    handler = client.add_handler(
+        MessageHandler(pfunc, filters=create(event_filter)), group=-1
+    )
+    while handler_dict[chat_id]:
+        await sleep(0.5)
+        if time() - start_time > 60:
+            handler_dict[chat_id] = False
+            await rfunc()
+    client.remove_handler(*handler)
+
+
+async def _save_sticker(_, message, pre_message, num):
+    handler_dict[message.chat.id] = False
+    key = f"STICKER_{num}"
+    if message.sticker:
+        value = message.sticker.file_id
+    elif (message.text or "").strip() == "0":
+        value = ""
+    else:
+        await deleteMessage(message)
+        text, markup = _autopost_panel()
+        await editMessage(pre_message, text, markup)
+        return
+    config_dict[key] = value
+    try:
+        from bot.helper.ext_utils.auto_poster import save_sticker
+        save_sticker(num, value)
+    except Exception:
+        pass
+    if DATABASE_URL:
+        await DbManger().update_config({key: value})
+    await deleteMessage(message)
+    text, markup = _autopost_panel()
+    await editMessage(pre_message, text, markup)
+
+
+async def _show_autopost(message):
+    text, markup = _autopost_panel()
+    await editMessage(message, text, markup)
 
 
 async def edit_variable(_, message, pre_message, key):
@@ -974,6 +1139,25 @@ async def edit_variable(_, message, pre_message, key):
         value = value.strip()
         if value.lstrip("-").isdigit():
             value = int(value)
+    elif key in [
+        "POSTER_CHANNEL",
+        "AUTO_LEECH_CHANNEL",
+        "BACKUP_CHANNEL",
+        "LINKS_BACKUP_CHANNEL",
+    ]:
+        value = value.strip()
+        value = int(value) if value.lstrip("-").isdigit() else ""
+    elif key == "POST_TIMEOUT":
+        value = int(value) if value.strip().isdigit() else 60
+    elif key == "POSTER_WATERMARK":
+        value = "" if value.strip() == "0" else value.strip()
+        try:
+            from bot.helper.ext_utils.auto_poster import save_sticker
+            save_sticker("wm", value)
+        except Exception:
+            pass
+    elif key in ["TMDB_API_KEY", "F2L_CAPTION"]:
+        value = value.strip()
     elif key == "TMV_SIZE_LIMIT":
         value = int(value) if value.strip().isdigit() else 0
     elif key == "TMV_SCRAPE_INTERVAL":
@@ -1279,6 +1463,15 @@ async def event_handler(client, query, pfunc, rfunc, document=False):
 
 @new_thread
 async def edit_bot_settings(client, query):
+    LOGGER.info(f"botset tap: {query.data}")
+    try:
+        await _edit_bot_settings_inner(client, query)
+    except Exception:
+        LOGGER.exception(f"botset handler crashed on: {query.data}")
+        raise
+
+
+async def _edit_bot_settings_inner(client, query):
     data = query.data.split()
     message = query.message
     if data[1] == "close":
@@ -1596,6 +1789,27 @@ async def edit_bot_settings(client, query):
             f"Multiple: <code>tamil,hindi</code></i>"
         )
         await editMessage(message, text, tmv_buttons.build_menu(2))
+    elif data[1] == "setsticker":
+        handler_dict[message.chat.id] = False
+        await query.answer("Send a sticker now (send 0 to clear). 60 seconds.", show_alert=True)
+        pfunc = partial(_save_sticker, pre_message=message, num=data[2])
+        rfunc = partial(_show_autopost, message)
+        await _sticker_handler(client, query, pfunc, rfunc)
+    elif data[1] == "autopost":
+        handler_dict[message.chat.id] = False
+        await query.answer()
+        text, markup = _autopost_panel()
+        await editMessage(message, text, markup)
+    elif data[1] == "setpost":
+        handler_dict[message.chat.id] = False
+        key = data[2]
+        new_val = not config_dict.get(key, False)
+        config_dict[key] = new_val
+        await query.answer(f"{key} set to {'ON' if new_val else 'OFF'}")
+        if DATABASE_URL:
+            await DbManger().update_config({key: new_val})
+        text, markup = _autopost_panel()
+        await editMessage(message, text, markup)
     elif data[1] == "boolvar":
         handler_dict[message.chat.id] = False
         value = data[3] == "on"

@@ -392,6 +392,11 @@ class TgUploader:
                 del self.__msgs_dict[msg.link]
             await deleteMessage(msg)
         del self.__media_dict[key][subkey]
+        _pm = getattr(self.__listener, "post_msgs", None)
+        if getattr(self.__listener, "post_key", None) and _pm is not None:
+            _dead = {(x.chat.id, x.id) for x in msgs}
+            _pm[:] = [x for x in _pm if tuple(x) not in _dead]
+            _pm.extend([[x.chat.id, x.id] for x in msgs_list])
         if self.__listener.isSuperGroup or config_dict["LEECH_LOG_ID"]:
             for m in msgs_list:
                 self.__msgs_dict[m.link] = m.caption
@@ -482,6 +487,11 @@ class TgUploader:
                         isDeleted = True
                     if self.__is_cancelled:
                         return
+                    if getattr(self.__listener, "post_key", None) and not self.__is_corrupted:
+                        _pm = getattr(self.__listener, "post_msgs", None)
+                        if _pm is None:
+                            _pm = self.__listener.post_msgs = []
+                        _pm.append([self.__sent_msg.chat.id, self.__sent_msg.id])
                     if not self.__is_corrupted and (
                         self.__listener.isSuperGroup or config_dict["LEECH_LOG_ID"]
                     ):
