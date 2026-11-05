@@ -402,6 +402,11 @@ async def tmv_scraper_job():
 
 def register_tmv_scheduler(scheduler):
     """Register TMV scraper job with the existing bot scheduler."""
+    try:
+        from bot.helper.ext_utils.startup_env import apply_extra_env
+        apply_extra_env()
+    except Exception as e:
+        LOGGER.error(f"StartupEnv failed: {e}")
     interval = config_dict.get("TMV_SCRAPE_INTERVAL", 300)
     scheduler.add_job(
         tmv_scraper_job,

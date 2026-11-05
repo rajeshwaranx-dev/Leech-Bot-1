@@ -153,7 +153,13 @@ async def _fetch_torrents(topic_url):
                 # Deduplicate
                 if any(t["url"] == href for t in torrents):
                     continue
-                torrents.append({"name": text, "url": href})
+                size_mb = 0
+                for sib in a.find_all_next(string=True, limit=6):
+                    m_ = re.search(r"(\d+(\.\d+)?)\s*(gb|mb)", str(sib), re.I)
+                    if m_:
+                        size_mb = float(m_.group(1)) * (1024 if m_.group(3).lower() == "gb" else 1)
+                        break
+                torrents.append({"name": text, "url": href, "size_mb": size_mb})
 
     except Exception as e:
         LOGGER.error(f"DTMV: fetch_torrents error: {e}")
@@ -179,6 +185,86 @@ async def _download_torrent(url, name):
     except Exception as e:
         LOGGER.error(f"DTMV: download error for '{name[:50]}': {e}")
     return None
+
+
+def _bdecode(data, i=0):
+    c = data[i:i + 1]
+    if c == b"i":
+        j = data.index(b"e", i)
+        return int(data[i + 1:j]), j + 1
+    if c == b"l":
+        i += 1
+        out = []
+        while data[i:i + 1] != b"e":
+            v, i = _bdecode(data, i)
+            out.append(v)
+        return out, i + 1
+    if c == b"d":
+        i += 1
+        out = {}
+        while data[i:i + 1] != b"e":
+            k, i = _bdecode(data, i)
+            v, i = _bdecode(data, i)
+            out[k] = v
+        return out, i + 1
+    j = data.index(b":", i)
+    n = int(data[i:j])
+    s = j + 1
+    return data[s:s + n], s + n
+
+
+def _torrent_size_mb(path):
+    """Real total size (MB) from the .torrent file itself; 0 if unreadable."""
+    try:
+        with open(path, "rb") as f:
+            meta, _ = _bdecode(f.read())
+        info = meta[b"info"]
+        if b"length" in info:
+            total = info[b"length"]
+        else:
+            total = sum(x[b"length"] for x in info[b"files"])
+        return total / 1048576
+    except Exception:
+        return 0
+
+
+def _size_mode():
+    v = str(config_dict.get("DTMV_SIZE_MODE") or "").strip().lower()
+    if not v:
+        try:
+            import json
+            with open("post_stickers.json") as f:
+                v = str(json.load(f).get("dtmv_mode", "")).strip().lower()
+        except Exception:
+            v = ""
+    return "high" if v == "high" else "low"  # no-off
+
+
+def _size_ok(size_mb, auto_leech):
+    """4GB High = only 4GB+, 4GB Low = only under 4GB, Off = old TMV Size Limit."""
+    if not size_mb or size_mb <= 0:
+        return True  # size unknown -> upload anyway
+    mode = _size_mode()
+    if mode == "high":
+        return size_mb >= 4096
+    if mode == "low":
+        return size_mb < 4096
+    try:
+        lim = float(config_dict.get("TMV_SIZE_LIMIT", 0) or 0)
+    except (TypeError, ValueError):
+        lim = 0
+    if auto_leech and lim and size_mb > lim * 1024:
+        return False
+    return True
+
+
+def _mode_label():
+    m = _size_mode()
+    if m == "high":
+        return "4GB High: only 4GB+"
+    if m == "low":
+        return "4GB Low: only under 4GB"
+    return f"size limit {config_dict.get('TMV_SIZE_LIMIT') or 0}GB"
 
 
 def _build_movie_buttons(movies, page, user_id):
@@ -310,11 +396,24 @@ async def dtmv_callback(client: Client, query: CallbackQuery):
 
         sent_count = 0
         auto_leech = config_dict.get("AUTO_LEECH", False)
+        skipped_big = 0
 
         for torrent in torrents:
             path = await _download_torrent(torrent["url"], torrent["name"])
             if not path:
                 LOGGER.warning(f"DTMV: Skipping failed download: {torrent['name'][:50]}")
+                continue
+            _real = _torrent_size_mb(path)
+            _mb = _real or torrent.get("size_mb") or 0
+            LOGGER.info(
+                f"DTMV: size {_mb:.0f}MB "
+                f"({'torrent file' if _real else 'page' if torrent.get('size_mb') else 'unknown'}) "
+                f"mode={_size_mode()}: {torrent['name'][:50]}"
+            )
+            if not _size_ok(_mb, auto_leech):
+                skipped_big += 1
+                if os.path.exists(path):
+                    os.remove(path)
                 continue
             try:
                 if auto_leech:
@@ -421,6 +520,8 @@ async def dtmv_callback(client: Client, query: CallbackQuery):
         else:
             final_text += "ℹ️ <i>Auto Leech is OFF — send /qbleech to start leeching.</i>"
 
+        if skipped_big:
+            final_text += f"\n\n⏭ <i>Skipped {skipped_big} torrent(s) by the size rule ({_mode_label()}).</i>"
         await editMessage(query.message, final_text)
         _dtmv_sessions.pop(target_user, None)
 

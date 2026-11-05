@@ -881,6 +881,17 @@ _BACK_TARGETS = {
 }
 
 
+def _dtmv_mode():
+    v = str(config_dict.get("DTMV_SIZE_MODE") or "").strip().lower()
+    if not v:
+        try:
+            from bot.helper.ext_utils.auto_poster import get_sticker
+            v = str(get_sticker("dtmv_mode") or "").strip().lower()
+        except Exception:
+            v = ""
+    return "high" if v == "high" else "low"
+
+
 async def get_buttons(key=None, edit_type=None, edit_mode=None, mess=None):
     buttons = ButtonMaker()
     if key is None:
@@ -1719,6 +1730,9 @@ async def _edit_bot_settings_inner(client, query):
             "botset editvar TMV_SCRAPE_INTERVAL edit",
         )
         tmv_buttons.ibutton(f"💬 TMV Chat [{config_dict.get('TMV_CHAT') or 'PM'}]", "botset editvar TMV_CHAT edit")
+        _dm = _dtmv_mode()
+        _dm_txt = {"high": "4GB+ only", "low": "under 4GB only"}.get(_dm, "old Size Limit")
+        tmv_buttons.ibutton(f"📏 DTMV: {'⬆️ 4GB High' if _dm == 'high' else '⬇️ 4GB Low'}", "botset settmv DTMV_CYCLE")
         tmv_buttons.ibutton("Back", "botset back")
         tmv_buttons.ibutton("Close", "botset close")
         text = (
@@ -1729,7 +1743,8 @@ async def _edit_bot_settings_inner(client, query):
             f"➲ <b>Size Limit :</b> <code>{f'{tmv_size}GB' if tmv_size else 'No Limit'}</code>\n"
             f"➲ <b>CAM/PreDVD :</b> <code>{'ON (taken)' if tmv_cam else 'OFF (skipped)'}</code>\n"
             f"➲ <b>Scrape Interval :</b> <code>{tmv_interval}s</code>\n"
-            f"➲ <b>TMV Chat :</b> <code>{config_dict.get('TMV_CHAT') or 'Owner PM'}</code>\n\n"
+            f"➲ <b>TMV Chat :</b> <code>{config_dict.get('TMV_CHAT') or 'Owner PM'}</code>\n"
+            f"➲ <b>DTMV Size :</b> <code>{_dm_txt}</code>\n\n"
             f"<i>Language options: <code>all</code>, <code>tamil</code>, <code>hindi</code>, "
             f"<code>telugu</code>, <code>malayalam</code>, <code>kannada</code>, "
             f"<code>english</code>, <code>tamil+multi</code>, <code>multi</code>\n"
@@ -1739,9 +1754,19 @@ async def _edit_bot_settings_inner(client, query):
     elif data[1] == "settmv":
         handler_dict[message.chat.id] = False
         key = data[2]
-        current = config_dict.get(key, False)
-        new_val = not current
-        await query.answer(f"✅ {key} set to {'ON' if new_val else 'OFF'}", show_alert=False)
+        if key == "DTMV_CYCLE":
+            new_val = "low" if _dtmv_mode() == "high" else "high"  # (tap to switch)
+            key = "DTMV_SIZE_MODE"
+            config_dict[key] = new_val
+            try:
+                from bot.helper.ext_utils.auto_poster import save_sticker
+                save_sticker("dtmv_mode", new_val)
+            except Exception:
+                pass
+        else:
+            current = config_dict.get(key, False)
+            new_val = not current
+        await query.answer(f"✅ {key} set to {new_val.upper() if isinstance(new_val, str) else ('ON' if new_val else 'OFF')}", show_alert=False)
         config_dict[key] = new_val
         if DATABASE_URL:
             await DbManger().update_config({key: new_val})
@@ -1772,6 +1797,9 @@ async def _edit_bot_settings_inner(client, query):
         tmv_buttons.ibutton("🔗 TMV URL", "botset editvar TMV_URL edit")
         tmv_buttons.ibutton(f"⏱ Interval [{tmv_interval}s]", "botset editvar TMV_SCRAPE_INTERVAL edit")
         tmv_buttons.ibutton(f"💬 TMV Chat [{config_dict.get('TMV_CHAT') or 'PM'}]", "botset editvar TMV_CHAT edit")
+        _dm = _dtmv_mode()
+        _dm_txt = {"high": "4GB+ only", "low": "under 4GB only"}.get(_dm, "old Size Limit")
+        tmv_buttons.ibutton(f"📏 DTMV: {'⬆️ 4GB High' if _dm == 'high' else '⬇️ 4GB Low'}", "botset settmv DTMV_CYCLE")
         tmv_buttons.ibutton("Back", "botset back")
         tmv_buttons.ibutton("Close", "botset close")
         text = (
@@ -1782,7 +1810,8 @@ async def _edit_bot_settings_inner(client, query):
             f"➲ <b>Size Limit :</b> <code>{f'{tmv_size}GB' if tmv_size else 'No Limit'}</code>\n"
             f"➲ <b>CAM/PreDVD :</b> <code>{'ON (taken)' if tmv_cam else 'OFF (skipped)'}</code>\n"
             f"➲ <b>Scrape Interval :</b> <code>{tmv_interval}s</code>\n"
-            f"➲ <b>TMV Chat :</b> <code>{config_dict.get('TMV_CHAT') or 'Owner PM'}</code>\n\n"
+            f"➲ <b>TMV Chat :</b> <code>{config_dict.get('TMV_CHAT') or 'Owner PM'}</code>\n"
+            f"➲ <b>DTMV Size :</b> <code>{_dm_txt}</code>\n\n"
             f"<i>Language options: <code>all</code>, <code>tamil</code>, <code>hindi</code>, "
             f"<code>telugu</code>, <code>malayalam</code>, <code>kannada</code>, "
             f"<code>english</code>, <code>tamil+multi</code>, <code>multi</code>\n"
